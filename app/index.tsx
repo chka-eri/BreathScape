@@ -144,8 +144,8 @@ export default function HomeScreen() {
   const phaseStartRef = useRef(Date.now());
   const phaseRef = useRef(0);
   const patternRef = useRef(0);
+  const cycleCountRef = useRef(0);
 
-  phaseRef.current = currentPhase;
   patternRef.current = patternIndex;
 
   const pattern = PATTERNS[patternIndex];
@@ -167,8 +167,10 @@ export default function HomeScreen() {
       Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
       const nextPhase = (curPhase + 1) % phaseDurations.length;
       if (nextPhase === 0) {
-        setCycleCount((c) => c + 1);
+        cycleCountRef.current += 1;
+        setCycleCount(cycleCountRef.current);
       }
+      phaseRef.current = nextPhase;
       setCurrentPhase(nextPhase);
       phaseStartRef.current = now;
       const nextLabel = phaseDurations[nextPhase]?.label || '';
