@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 import {
   Dimensions,
   Platform,
@@ -142,16 +142,22 @@ export default function HomeScreen() {
   const [cycleCount, setCycleCount] = useState(0);
   const timerRef = useRef<ReturnType<typeof setInterval> | null>(null);
   const phaseStartRef = useRef(Date.now());
+  const phaseRef = useRef(0);
+  const patternRef = useRef(0);
+
+  phaseRef.current = currentPhase;
+  patternRef.current = patternIndex;
 
   const pattern = PATTERNS[patternIndex];
 
   const circleScale = useSharedValue(0.4);
 
-  const tick = useCallback(() => {
+  const tickRef = useRef(() => {});
+  tickRef.current = () => {
     const now = Date.now();
     const elapsed = (now - phaseStartRef.current) / 1000;
-    const phaseDurations = PATTERNS[patternIndex].phases;
-    const curPhase = currentPhase;
+    const phaseDurations = PATTERNS[patternRef.current].phases;
+    const curPhase = phaseRef.current;
     const dur = phaseDurations[curPhase]?.duration || 4;
     const progress = Math.min(1, elapsed / dur);
 
@@ -166,7 +172,11 @@ export default function HomeScreen() {
       setCurrentPhase(nextPhase);
       phaseStartRef.current = now;
       const nextLabel = phaseDurations[nextPhase]?.label || '';
-      const target = nextLabel === 'Breathe In' ? 1 : nextLabel === 'Breathe Out' ? 0.4 : nextPhase === 0 ? 0.4 : 1;
+      const prevLabel = phaseDurations[curPhase]?.label || '';
+      let target = 0.4;
+      if (nextLabel === 'Breathe In') target = 1;
+      else if (nextLabel === 'Breathe Out') target = 0.4;
+      else if (nextLabel === 'Hold') target = prevLabel === 'Breathe In' ? 1 : 0.4;
       circleScale.value = withTiming(target, {
         duration: 100,
         easing: Easing.out(Easing.quad),
@@ -178,15 +188,16 @@ export default function HomeScreen() {
       if (label === 'Breathe In') target = 0.4 + progress * 0.6;
       else if (label === 'Breathe Out') target = 1 - progress * 0.6;
       else if (label === 'Hold') {
-        const prev = phaseDurations[curPhase - 1]?.label;
-        target = (prev === 'Breathe In' || (curPhase > 1 && phaseDurations[curPhase - 1]?.label === 'Hold' && phaseDurations[curPhase - 2]?.label === 'Breathe In')) ? 1 : 0.4;
+        let i = curPhase - 1;
+        while (i >= 0 && phaseDurations[i]?.label === 'Hold') i--;
+        target = phaseDurations[i]?.label === 'Breathe In' ? 1 : 0.4;
       }
       circleScale.value = withTiming(target, {
         duration: 50,
         easing: Easing.linear,
       });
     }
-  }, [currentPhase, patternIndex, circleScale]);
+  };
 
   const startSession = () => {
     Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
@@ -196,7 +207,7 @@ export default function HomeScreen() {
     setCycleCount(0);
     phaseStartRef.current = Date.now();
     circleScale.value = withTiming(0.4, { duration: 200 });
-    timerRef.current = setInterval(tick, 60);
+    timerRef.current = setInterval(() => tickRef.current(), 60);
   };
 
   const stopSession = () => {
